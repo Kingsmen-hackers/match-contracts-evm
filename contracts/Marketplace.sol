@@ -45,7 +45,8 @@ contract Marketplace {
         int256 price,
         uint256 requestId,
         string[] images,
-        uint256 sellerId
+        uint256 sellerId,
+        uint256[] sellerIds
     );
 
     event RequestAccepted(
@@ -285,6 +286,7 @@ contract Marketplace {
             block.timestamp
         );
         offers[offerId] = newOffer;
+        request.sellerIds.push(newOffer.sellerId);
 
         emit OfferCreated(
             offerId,
@@ -293,8 +295,10 @@ contract Marketplace {
             _price,
             _requestId,
             _images,
-            users[msg.sender].id
+            users[msg.sender].id,
+            request.sellerIds
         );
+        // mapping(address => mapping(uint256 => Offer)) offers;
     }
 
     function acceptOffer(uint256 _offerId) public {
@@ -329,7 +333,6 @@ contract Marketplace {
 
         offer.isAccepted = true;
         offer.updatedAt = block.timestamp;
-        request.sellerIds.push(offer.sellerId);
         request.offerIds.push(offer.id);
         request.lockedSellerId = offer.sellerId;
         request.sellersPriceQuote = offer.price;
