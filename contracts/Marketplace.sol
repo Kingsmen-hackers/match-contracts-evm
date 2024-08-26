@@ -79,6 +79,7 @@ contract Marketplace {
         uint256 id;
         string name;
         string description;
+        string phone;
         Location location;
     }
 
@@ -179,6 +180,7 @@ contract Marketplace {
     function createStore(
         string memory _name,
         string memory _description,
+        string memory _phone,
         int256 _latitude,
         int256 _longitude
     ) public {
@@ -195,6 +197,7 @@ contract Marketplace {
             storeId,
             _name,
             _description,
+            _phone,
             storeLocation
         );
         userStores[msg.sender][storeId] = newStore;
