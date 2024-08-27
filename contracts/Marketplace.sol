@@ -8,6 +8,12 @@ contract Marketplace {
         string username,
         uint8 accountType
     );
+    event UserUpdated(
+        address indexed userAddress,
+        uint256 userId,
+        string username,
+        uint8 accountType
+    );
     event StoreCreated(
         address indexed sellerAddress,
         uint256 storeId,
@@ -93,6 +99,7 @@ contract Marketplace {
         string phone;
         Location location;
         uint256 createdAt;
+        uint256 updatedAt;
         AccountType accountType;
     }
 
@@ -135,6 +142,7 @@ contract Marketplace {
     error Marketplace__OfferNotRemovable();
     error Marketplace__IndexOutOfBounds();
     error Marketplace__RequestLocked();
+    error Marketplace_InvalidUser();
 
     mapping(address => User) public users;
     mapping(uint256 => Request) public requests;
@@ -172,10 +180,39 @@ contract Marketplace {
             _phone,
             userLocation,
             block.timestamp,
+            block.timestamp,
             _accountType
         );
 
         emit UserCreated(msg.sender, userId, _username, uint8(_accountType));
+    }
+
+    function updateUser(
+        string memory _username,
+        string memory _phone,
+        int256 _latitude,
+        int256 _longitude,
+        AccountType _accountType
+    ) public {
+        User storage user = users[msg.sender];
+
+        if (user.id == 0) {
+            revert Marketplace_InvalidUser();
+        }
+
+        // Update user information
+        user.username = _username;
+        user.phone = _phone;
+        user.location = Location(_latitude, _longitude);
+        user.updatedAt = block.timestamp;
+        user.accountType = _accountType;
+
+        emit UserUpdated(
+            msg.sender,
+            user.id,
+            _username,
+            uint8(user.accountType)
+        );
     }
 
     function createStore(
