@@ -5,6 +5,7 @@
   "scripts": {
     "test": "yarn hardhat test",
     "test-staging": "yarn hardhat test --network sepolia",
+    "deploy-bnb": "yarn hardhat deploy --network bsc_test",
     "lint": "yarn solhint 'contracts/*.sol'",
     "lint:fix": "yarn solhint 'contracts/**/*.sol' --fix",
     "format": "yarn prettier --write .",
