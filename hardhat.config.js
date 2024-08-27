@@ -11,6 +11,7 @@ const SEPOLIA_RPC_URL =
 const BSC_TEST_RPC_URL = process.env.BSC_TEST_RPC_URL || "";
 const PRIVATE_KEY = process.env.PRIVATE_KEY || "0xkey";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "key";
+const BSC_API_KEY = process.env.BSC_API_KEY || "key";
 const COINMARKETCAP_API_KEY = process.env.COINMARKETCAP_API_KEY || "key";
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -43,7 +44,10 @@ module.exports = {
     token: "MATIC",
   },
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY,
+    apiKey: {
+      bscTestnet: BSC_API_KEY,
+      sepolia: ETHERSCAN_API_KEY,
+    },
     customChains: [],
   },
   solidity: "0.8.7",
