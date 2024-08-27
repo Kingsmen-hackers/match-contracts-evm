@@ -53,7 +53,8 @@ contract Marketplace {
         uint256 indexed requestId,
         uint256 indexed offerId,
         uint256 indexed sellerId,
-        uint256 updatedAt
+        uint256 updatedAt,
+        int256 sellersPriceQuote
     );
 
     event OfferRemoved(uint256 indexed offerId, address indexed sellerAddress);
@@ -346,7 +347,8 @@ contract Marketplace {
             request.id,
             offer.id,
             offer.sellerId,
-            request.updatedAt
+            request.updatedAt,
+            request.sellersPriceQuote
         );
         emit OfferAccepted(offer.id, msg.sender, true);
     }
