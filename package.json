@@ -4,7 +4,7 @@
   "description": "",
   "scripts": {
     "test": "yarn hardhat test",
-    "test-staging": "yarn hardhat test --network sepolia",
+    "test-staging": "yarn hardhat test --network bsc_test",
     "deploy-bnb": "yarn hardhat deploy --network bsc_test",
     "deploy-sepolia": "yarn hardhat deploy --network sepolia",
     "lint": "yarn solhint 'contracts/*.sol'",
