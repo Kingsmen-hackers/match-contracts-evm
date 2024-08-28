@@ -143,6 +143,7 @@ contract Marketplace {
     error Marketplace__IndexOutOfBounds();
     error Marketplace__RequestLocked();
     error Marketplace_InvalidUser();
+    error Marketplace_UserAlreadyExists();
 
     mapping(address => User) public users;
     mapping(uint256 => Request) public requests;
@@ -162,6 +163,11 @@ contract Marketplace {
         int256 _longitude,
         AccountType _accountType
     ) public {
+        User storage user = users[msg.sender];
+        if (user.id != 0) {
+            revert Marketplace_UserAlreadyExists();
+        }
+
         if (
             _accountType != AccountType.BUYER &&
             _accountType != AccountType.SELLER
