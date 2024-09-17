@@ -383,6 +383,10 @@ contract Marketplace {
         offers[offerId] = newOffer;
         request.sellerIds.push(newOffer.sellerId);
 
+        if (request.lifecycle == RequestLifecycle.PENDING) {
+            request.lifecycle = RequestLifecycle.ACCEPTED_BY_SELLER;
+        }
+
         emit OfferCreated(
             offerId,
             msg.sender,
