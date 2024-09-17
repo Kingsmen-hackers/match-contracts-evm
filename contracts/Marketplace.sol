@@ -65,6 +65,8 @@ contract Marketplace {
 
     event OfferRemoved(uint256 indexed offerId, address indexed sellerAddress);
 
+    event LocationEnabled(bool enabled, uint256 userId);
+
     enum AccountType {
         BUYER,
         SELLER
@@ -101,6 +103,7 @@ contract Marketplace {
         uint256 createdAt;
         uint256 updatedAt;
         AccountType accountType;
+        bool location_enabled;
     }
 
     struct Request {
@@ -139,6 +142,8 @@ contract Marketplace {
     error Marketplace__InvalidAccountType();
     error Marketplace__OfferAlreadyExists();
     error Marketplace__UnauthorizedRemoval();
+    error Marketplace__RequestNotAccepted();
+    error Marketplace__RequestNotLocked();
     error Marketplace__OfferNotRemovable();
     error Marketplace__IndexOutOfBounds();
     error Marketplace__RequestLocked();
@@ -187,7 +192,8 @@ contract Marketplace {
             userLocation,
             block.timestamp,
             block.timestamp,
-            _accountType
+            _accountType,
+            true
         );
 
         emit UserCreated(msg.sender, userId, _username, uint8(_accountType));
@@ -297,6 +303,48 @@ contract Marketplace {
             block.timestamp,
             block.timestamp
         );
+    }
+
+    function deleteRequest(uint256 _requestId) public {
+        Request storage request = requests[_requestId];
+
+        if (request.buyerId != users[msg.sender].id) {
+            revert Marketplace__UnauthorizedRemoval();
+        }
+
+        if (request.lifecycle != RequestLifecycle.PENDING) {
+            revert Marketplace__RequestLocked();
+        }
+
+        delete requests[_requestId];
+    }
+
+    function markRequestAsCompleted(uint256 _requestId) public {
+        Request storage request = requests[_requestId];
+
+        if (request.buyerId != users[msg.sender].id) {
+            revert Marketplace__UnauthorizedRemoval();
+        }
+
+        if (request.lifecycle != RequestLifecycle.ACCEPTED_BY_BUYER) {
+            revert Marketplace__RequestNotAccepted();
+        }
+
+        if (request.updatedAt + TIME_TO_LOCK > block.timestamp) {
+            revert Marketplace__RequestNotLocked();
+        }
+
+        request.lifecycle = RequestLifecycle.COMPLETED;
+        request.updatedAt = block.timestamp;
+    }
+
+    function toggleLocation(bool enabled) public {
+        users[msg.sender].location_enabled = enabled;
+        emit LocationEnabled(enabled, users[msg.sender].id);
+    }
+
+    function getLocationPreference() public view returns (bool) {
+        return users[msg.sender].location_enabled;
     }
 
     function createOffer(
