@@ -617,55 +617,6 @@ contract Marketplace {
         emit OfferAccepted(offer.id, msg.sender, true);
     }
 
-    function removeOffer(uint256 _offerId) public {
-        Offer storage offer = offers[_offerId];
-        Request storage request = requests[offer.requestId];
-
-        // Check if the sender is the seller who created the offer
-        if (offer.sellerId != users[msg.sender].id) {
-            revert Marketplace__UnauthorizedRemoval();
-        }
-
-        if (block.timestamp > offer.updatedAt + TIME_TO_LOCK) {
-            revert Marketplace__OfferNotRemovable();
-        }
-
-        if (
-            block.timestamp > request.updatedAt + TIME_TO_LOCK &&
-            request.lifecycle == RequestLifecycle.ACCEPTED_BY_BUYER
-        ) {
-            revert Marketplace__RequestLocked();
-        }
-        uint indexToRemove;
-        bool found = false;
-
-        for (uint i = 0; i < request.sellerIds.length; i++) {
-            if (request.sellerIds[i] == offer.sellerId) {
-                indexToRemove = i;
-                found = true;
-                break;
-            }
-        }
-        if (found) {
-            // Shift all elements after the one to remove left by one position
-            for (
-                uint i = indexToRemove;
-                i < request.sellerIds.length - 1;
-                i++
-            ) {
-                request.sellerIds[i] = request.sellerIds[i + 1];
-            }
-            // Remove the last element (duplicate after shifting)
-            request.sellerIds.pop();
-        }
-
-        // Delete the offer
-        delete offers[_offerId];
-
-        // Emit the event
-        emit OfferRemoved(_offerId, msg.sender);
-    }
-
     function userStoreCount(address user) public view returns (uint256) {
         return userStoreIds[user].length;
     }
