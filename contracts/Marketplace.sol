@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./interfaces/AggregatorV3Interface.sol";
+
+interface IERC20 {
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
+}
+
 contract Marketplace {
     event UserCreated(
         address indexed userAddress,
@@ -71,11 +81,17 @@ contract Marketplace {
         BUYER,
         SELLER
     }
+
+    enum CoinPayment {
+        ETH,
+        USDT
+    }
     enum RequestLifecycle {
         PENDING,
         ACCEPTED_BY_SELLER,
         ACCEPTED_BY_BUYER,
         REQUEST_LOCKED,
+        PAID,
         COMPLETED
     }
 
@@ -90,6 +106,17 @@ contract Marketplace {
         string description;
         string phone;
         Location location;
+    }
+
+    struct PaymentInfo {
+        address authority;
+        uint256 requestId;
+        address buyer;
+        address seller;
+        uint256 amount;
+        CoinPayment token;
+        uint256 createdAt;
+        uint256 updatedAt;
     }
 
     mapping(address => mapping(uint256 => Store)) public userStores;
@@ -120,6 +147,8 @@ contract Marketplace {
         RequestLifecycle lifecycle;
         Location location;
         uint256 updatedAt;
+        bool paid;
+        uint256 acceptedOfferId;
     }
 
     struct Offer {
@@ -132,18 +161,22 @@ contract Marketplace {
         bool isAccepted;
         uint256 createdAt;
         uint256 updatedAt;
+        address authority;
     }
 
     // Custom errors with Marketplace__ prefix
     error Marketplace__OnlySellersAllowed();
     error Marketplace__UnauthorizedBuyer();
     error Marketplace__OnlyBuyersAllowed();
+    error Marketplace__UnSupportedChainId();
     error Marketplace__OfferAlreadyAccepted();
     error Marketplace__InvalidAccountType();
     error Marketplace__OfferAlreadyExists();
     error Marketplace__UnauthorizedRemoval();
     error Marketplace__RequestNotAccepted();
+    error Marketplace__RequestAlreadyPaid();
     error Marketplace__RequestNotLocked();
+    error Marketplace__InsufficientFunds();
     error Marketplace__OfferNotRemovable();
     error Marketplace__IndexOutOfBounds();
     error Marketplace__RequestLocked();
@@ -153,13 +186,15 @@ contract Marketplace {
     mapping(address => User) public users;
     mapping(uint256 => Request) public requests;
     mapping(uint256 => Offer) public offers;
+    mapping(uint256 => PaymentInfo) public requestPaymentInfo;
 
     uint256 private _userCounter;
     uint256 private _storeCounter;
     uint256 private _requestCounter;
     uint256 private _offerCounter;
+    uint256 private _requestPaymentCounter;
 
-    uint256 constant TIME_TO_LOCK = 900;
+    uint256 constant TIME_TO_LOCK = 60;
 
     function createUser(
         string memory _username,
@@ -338,6 +373,138 @@ contract Marketplace {
         request.updatedAt = block.timestamp;
     }
 
+    function getAggregatorV3() public returns (AggregatorV3Interface) {
+        if (block.chainid == 1) {
+            return
+                AggregatorV3Interface(
+                    0x8A753747A1Fa494EC906cE90E9f37563A8AF630e
+                );
+        } else if (block.chainid == 11155111) {
+            return
+                AggregatorV3Interface(
+                    0x694AA1769357215DE4FAC081bf1f309aDC325306
+                );
+        } else {
+            revert Marketplace__UnSupportedChainId();
+        }
+    }
+
+    function payForRequestToken(
+        uint256 requestId,
+        CoinPayment coin
+    ) external payable {
+        Request storage request = requests[requestId];
+        Offer storage offer = offers[request.acceptedOfferId];
+
+        if (request.buyerId != users[msg.sender].id) {
+            revert Marketplace__UnauthorizedBuyer();
+        }
+
+        if (request.lifecycle != RequestLifecycle.ACCEPTED_BY_BUYER) {
+            revert Marketplace__RequestNotAccepted();
+        }
+
+        if (request.updatedAt + TIME_TO_LOCK > block.timestamp) {
+            revert Marketplace__RequestNotLocked();
+        }
+
+        if (!offer.isAccepted) {
+            revert Marketplace__RequestNotAccepted();
+        }
+
+        if (request.paid) {
+            revert Marketplace__RequestAlreadyPaid();
+        }
+
+        request.paid = true;
+        request.lifecycle = RequestLifecycle.PAID;
+
+        uint256 paymentId = _requestPaymentCounter;
+
+        PaymentInfo memory newPaymentInfo = PaymentInfo(
+            msg.sender,
+            requestId,
+            msg.sender,
+            offer.authority,
+            0,
+            coin,
+            block.timestamp,
+            block.timestamp
+        );
+
+        if (coin == CoinPayment.USDT) {
+            AggregatorV3Interface priceFeed = getAggregatorV3();
+            (, int256 price, , , ) = priceFeed.latestRoundData();
+            uint256 usdtAmount = (offer.price * uint256(price)) / 1e8;
+            newPaymentInfo.amount = usdtAmount;
+
+            IERC20 usdt = IERC20(address_of_PYUSDT_token);
+            if (!usdt.transferFrom(msg.sender, address(this), usdtAmount)) {
+                revert Marketplace__InsufficientFunds();
+            }
+        } else {
+            revert Marketplace__InsufficientFunds();
+        }
+        requestPaymentInfo[paymentId] = newPaymentInfo;
+        _requestPaymentCounter++;
+    }
+
+    function payForRequest(
+        uint256 requestId,
+        CoinPayment coin
+    ) external payable {
+        Request storage request = requests[requestId];
+        Offer storage offer = offers[request.acceptedOfferId];
+
+        if (request.buyerId != users[msg.sender].id) {
+            revert Marketplace__UnauthorizedBuyer();
+        }
+
+        if (request.lifecycle != RequestLifecycle.ACCEPTED_BY_BUYER) {
+            revert Marketplace__RequestNotAccepted();
+        }
+
+        if (request.updatedAt + TIME_TO_LOCK > block.timestamp) {
+            revert Marketplace__RequestNotLocked();
+        }
+
+        if (!offer.isAccepted) {
+            revert Marketplace__RequestNotAccepted();
+        }
+
+        if (request.paid) {
+            revert Marketplace__RequestAlreadyPaid();
+        }
+
+        request.paid = true;
+        request.lifecycle = RequestLifecycle.PAID;
+
+        uint256 paymentId = _requestPaymentCounter;
+
+        PaymentInfo memory newPaymentInfo = PaymentInfo(
+            msg.sender,
+            requestId,
+            msg.sender,
+            offer.authority,
+            0,
+            coin,
+            block.timestamp,
+            block.timestamp
+        );
+        requestPaymentInfo[paymentId] = newPaymentInfo;
+
+        if (coin == CoinPayment.ETH) {
+            if (msg.value < offer.price) {
+                revert Marketplace__InsufficientFunds();
+            }
+            newPaymentInfo.amount = offer.price;
+        } else {
+            revert Marketplace__InsufficientFunds();
+        }
+        requestPaymentInfo[paymentId] = newPaymentInfo;
+        _requestPaymentCounter++;
+    }
+
     function toggleLocation(bool enabled) public {
         users[msg.sender].location_enabled = enabled;
         emit LocationEnabled(enabled, users[msg.sender].id);
@@ -378,7 +545,8 @@ contract Marketplace {
             users[msg.sender].id,
             false,
             block.timestamp,
-            block.timestamp
+            block.timestamp,
+            msg.sender
         );
         offers[offerId] = newOffer;
         request.sellerIds.push(newOffer.sellerId);
@@ -435,6 +603,7 @@ contract Marketplace {
         request.offerIds.push(offer.id);
         request.lockedSellerId = offer.sellerId;
         request.sellersPriceQuote = offer.price;
+        request.acceptedOfferId = offer.id;
         request.lifecycle = RequestLifecycle.ACCEPTED_BY_BUYER;
         request.updatedAt = block.timestamp;
 
