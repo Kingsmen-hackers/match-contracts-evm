@@ -58,7 +58,7 @@ contract Marketplace {
         uint256 indexed offerId,
         address indexed sellerAddress,
         string storeName,
-        int256 price,
+        uint256 price,
         uint256 requestId,
         string[] images,
         uint256 sellerId,
@@ -70,7 +70,7 @@ contract Marketplace {
         uint256 indexed offerId,
         uint256 indexed sellerId,
         uint256 updatedAt,
-        int256 sellersPriceQuote
+        uint256 sellersPriceQuote
     );
 
     event OfferRemoved(uint256 indexed offerId, address indexed sellerAddress);
@@ -137,7 +137,7 @@ contract Marketplace {
         uint256 id;
         string name;
         uint256 buyerId;
-        int256 sellersPriceQuote;
+        uint256 sellersPriceQuote;
         uint256[] sellerIds;
         uint256[] offerIds;
         uint256 lockedSellerId;
@@ -153,7 +153,7 @@ contract Marketplace {
 
     struct Offer {
         uint256 id;
-        int256 price;
+        uint256 price;
         string[] images;
         uint256 requestId;
         string storeName;
@@ -195,6 +195,7 @@ contract Marketplace {
     uint256 private _requestPaymentCounter;
 
     uint256 constant TIME_TO_LOCK = 60;
+    address constant USDT = address(0);
 
     function createUser(
         string memory _username,
@@ -319,8 +320,11 @@ contract Marketplace {
             block.timestamp,
             RequestLifecycle.PENDING,
             requestLocation,
-            block.timestamp
+            block.timestamp,
+            false,
+            0
         );
+
         requests[requestId] = newRequest;
         emit RequestCreated(
             requestId,
@@ -373,7 +377,7 @@ contract Marketplace {
         request.updatedAt = block.timestamp;
     }
 
-    function getAggregatorV3() public returns (AggregatorV3Interface) {
+    function getAggregatorV3() public view returns (AggregatorV3Interface) {
         if (block.chainid == 1) {
             return
                 AggregatorV3Interface(
@@ -438,7 +442,7 @@ contract Marketplace {
             uint256 usdtAmount = (offer.price * uint256(price)) / 1e8;
             newPaymentInfo.amount = usdtAmount;
 
-            IERC20 usdt = IERC20(address_of_PYUSDT_token);
+            IERC20 usdt = IERC20(USDT);
             if (!usdt.transferFrom(msg.sender, address(this), usdtAmount)) {
                 revert Marketplace__InsufficientFunds();
             }
@@ -515,7 +519,7 @@ contract Marketplace {
     }
 
     function createOffer(
-        int256 _price,
+        uint256 _price,
         string[] memory _images,
         uint256 _requestId,
         string memory _storeName
